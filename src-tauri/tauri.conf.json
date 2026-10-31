@@ -1,0 +1,37 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Statslock Companion",
+  "version": "0.1.1",
+  "identifier": "io.statslock.companion",
+  "build": { "frontendDist": "../src" },
+  "app": {
+    "windows": [
+      {
+        "label": "overlay",
+        "title": "Statslock Companion",
+        "width": 420,
+        "height": 640,
+        "visible": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": true
+      }
+    ],
+    "security": { "csp": "default-src 'self'; connect-src https://statslock.io; img-src 'self' https: data:" }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "createUpdaterArtifacts": false,
+    "icon": ["icons/icon.ico", "icons/icon.png"]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "REPLACE_WITH_YOUR_TAURI_SIGNER_PUBLIC_KEY",
+      "endpoints": ["https://github.com/Nordstrm/statslock-companion/releases/latest/download/latest.json"],
+      "windows": { "installMode": "passive" }
+    }
+  }
+}
