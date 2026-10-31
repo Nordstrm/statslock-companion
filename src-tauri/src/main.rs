@@ -60,6 +60,17 @@ fn steam_account_id() -> Option<u32> {
     None
 }
 
+#[tauri::command]
+fn game_running(state: State<AppState>) -> bool { *state.game_running.lock().unwrap() }
+
+/// Opens statslock.io links in the default browser (only https://statslock.io).
+#[tauri::command]
+fn open_url(url: String) {
+    if !url.starts_with("https://statslock.io/") { return; }
+    #[cfg(windows)]
+    { let _ = std::process::Command::new("explorer").arg(&url).spawn(); }
+}
+
 fn game_is_running(sys: &mut System) -> bool {
     sys.refresh_processes_specifics(sysinfo::ProcessesToUpdate::All, true, ProcessRefreshKind::new());
     sys.processes().values().any(|p| {
@@ -70,12 +81,14 @@ fn game_is_running(sys: &mut System) -> bool {
 
 fn toggle_overlay(app: &tauri::AppHandle) {
     if let Some(w) = app.get_webview_window("overlay") {
-        if w.is_visible().unwrap_or(false) { let _ = w.hide(); } else { let _ = w.show(); let _ = w.set_focus(); }
+        // Show without taking focus so Deadlock stays the active window (no tab-out).
+        // Click the overlay if you want to type in it.
+        if w.is_visible().unwrap_or(false) { let _ = w.hide(); } else { let _ = w.show(); }
     }
 }
 
 fn main() {
-    let toggle = Shortcut::new(Some(Modifiers::ALT), Code::KeyS);
+    let toggle = Shortcut::new(None::<Modifiers>, Code::F8);
     tauri::Builder::default()
         .manage(AppState::default())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -87,11 +100,11 @@ fn main() {
                 })
                 .build(),
         )
-        .invoke_handler(tauri::generate_handler![get_meta, steam_account_id])
+        .invoke_handler(tauri::generate_handler![get_meta, steam_account_id, game_running, open_url])
         .setup(move |app| {
             app.global_shortcut().register(toggle)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let show = MenuItem::with_id(app, "show", "Show overlay (Alt+S)", true, None::<&str>)?;
+            let show = MenuItem::with_id(app, "show", "Show overlay (F8)", true, None::<&str>)?;
             TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
                 .tooltip("Statslock Companion")

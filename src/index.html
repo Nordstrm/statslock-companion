@@ -4,25 +4,39 @@
 <meta charset="utf-8" />
 <title>Statslock Companion</title>
 <style>
-  :root { --bg: rgba(14,12,10,.92); --fg: #f2ebe0; --muted: #a39887; --accent: #e3a33b; --line: rgba(255,255,255,.08); }
+  :root { --bg: rgba(14,12,10,.94); --fg: #f2ebe0; --muted: #a39887; --accent: #e3a33b; --ally: #4fb3a9; --enemy: #d9604c; --line: rgba(255,255,255,.08); }
   * { box-sizing: border-box; }
-  body { margin: 0; font: 14px/1.4 system-ui, sans-serif; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 12px; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+  body { margin: 0; font: 13px/1.4 system-ui, sans-serif; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 12px; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
   header { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); -webkit-app-region: drag; }
   header b { color: var(--accent); }
-  input { width: 100%; margin: 10px 12px 0; width: calc(100% - 24px); padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255,255,255,.04); color: var(--fg); }
+  nav { display: flex; gap: 4px; padding: 8px 12px 0; }
+  nav button { flex: 1; cursor: pointer; padding: 6px; border-radius: 6px; border: 1px solid var(--line); background: none; color: var(--muted); font-size: 12px; }
+  nav button.on { color: var(--accent); border-color: var(--accent); }
+  input { margin: 8px 12px 0; width: calc(100% - 24px); padding: 7px 10px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255,255,255,.04); color: var(--fg); }
   main { flex: 1; overflow: auto; padding: 10px 12px; }
-  .hero { border: 1px solid var(--line); border-radius: 10px; padding: 10px; margin-bottom: 10px; }
-  .row { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
-  h3 { margin: 0 0 4px; } h4 { margin: 10px 0 4px; font-size: 11px; text-transform: uppercase; color: var(--muted); letter-spacing: .06em; }
+  .card { border: 1px solid var(--line); border-radius: 10px; padding: 9px; margin-bottom: 8px; }
+  .row { display: flex; justify-content: space-between; gap: 6px; color: var(--muted); font-size: 12px; align-items: center; }
+  h3 { margin: 0 0 4px; font-size: 14px; } h4 { margin: 10px 0 4px; font-size: 11px; text-transform: uppercase; color: var(--muted); letter-spacing: .06em; }
   .chip { display: inline-block; padding: 2px 8px; margin: 2px; border-radius: 99px; background: rgba(255,255,255,.06); font-size: 12px; }
-  button.code { cursor: pointer; border: 1px solid var(--accent); color: var(--accent); background: none; border-radius: 6px; padding: 2px 8px; font-size: 12px; }
-  .status { font-size: 12px; color: var(--muted); margin-left: auto; }
+  button.code, a.link { cursor: pointer; border: 1px solid var(--accent); color: var(--accent); background: none; border-radius: 6px; padding: 2px 8px; font-size: 12px; text-decoration: none; }
+  .status { font-size: 11px; color: var(--muted); margin-left: auto; }
+  .team { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; margin: 8px 0 4px; }
+  .player { display: grid; grid-template-columns: 32px 1fr auto; gap: 8px; align-items: center; border-left: 3px solid var(--line); }
+  .player.enemy { border-left-color: var(--enemy); } .player.ally { border-left-color: var(--ally); }
+  .player img, .avatar { width: 32px; height: 32px; border-radius: 6px; background: rgba(255,255,255,.06); object-fit: cover; }
+  .wr-good { color: var(--ally); } .wr-bad { color: var(--enemy); }
+  .muted { color: var(--muted); }
 </style>
 </head>
 <body>
 <header><b>Statslock</b> Companion <span class="status" id="status">Waiting for Deadlock…</span></header>
-<input id="q" placeholder="Search hero…" autofocus />
-<main id="list">Loading today's meta…</main>
+<nav>
+  <button data-tab="live" class="on">Live match</button>
+  <button data-tab="me">My profile</button>
+  <button data-tab="meta">Meta builds</button>
+</nav>
+<input id="q" placeholder="Search hero…" style="display:none" />
+<main id="list">Loading…</main>
 <script src="main.js"></script>
 </body>
 </html>

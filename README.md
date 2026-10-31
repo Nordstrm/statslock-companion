@@ -1,6 +1,6 @@
 # Statslock Companion (Tauri v2)
 
-Tiny Windows tray app: Alt+S overlay with daily meta, counters and community build IDs for Deadlock.
+Tiny Windows tray app: F8 overlay with daily meta, counters and community build IDs for Deadlock.
 
 - VAC-safe: no memory reading, injection or hooks. Only process-list polling (every 8s), Steam registry `ActiveUser`, and `GET https://statslock.io/api/public/companion/meta`.
 - Offline cache in `%LOCALAPPDATA%/StatslockCompanion/meta.json`.
