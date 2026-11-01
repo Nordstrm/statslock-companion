@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <title>Statslock Companion</title>
 <style>
-  :root { --bg: rgba(14,12,10,.94); --fg: #f2ebe0; --muted: #a39887; --accent: #e3a33b; --ally: #4fb3a9; --enemy: #d9604c; --line: rgba(255,255,255,.08); }
+  :root { --bg: rgba(14,12,10,var(--op,.94)); --fg: #f2ebe0; --muted: #a39887; --accent: #e3a33b; --ally: #4fb3a9; --enemy: #d9604c; --line: rgba(255,255,255,.08); }
   * { box-sizing: border-box; }
   body { margin: 0; font: 13px/1.4 system-ui, sans-serif; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 12px; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
   header { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); -webkit-app-region: drag; }
@@ -26,14 +26,18 @@
   .player img, .avatar { width: 32px; height: 32px; border-radius: 6px; background: rgba(255,255,255,.06); object-fit: cover; }
   .wr-good { color: var(--ally); } .wr-bad { color: var(--enemy); }
   .muted { color: var(--muted); }
+  .key { display:inline-block; min-width:80px; text-align:center; padding:6px 10px; border:1px solid var(--accent); border-radius:6px; color:var(--accent); cursor:pointer; background:none; }
+  .key.listening { animation: pulse 1s infinite; } @keyframes pulse { 50% { opacity:.4 } }
+  .err { color: var(--enemy); font-size: 12px; } input[type=range] { margin:6px 0 0; width:100%; padding:0; }
 </style>
 </head>
 <body>
-<header><b>Statslock</b> Companion <span class="status" id="status">Waiting for Deadlock…</span></header>
+<header><b>Statslock</b> Companion <span class="status" id="status">Starting…</span><button id="close" title="Hide" style="-webkit-app-region:no-drag;background:none;border:0;color:var(--muted);cursor:pointer;font-size:16px">×</button></header>
 <nav>
   <button data-tab="live" class="on">Live match</button>
   <button data-tab="me">My profile</button>
   <button data-tab="meta">Meta builds</button>
+  <button data-tab="settings">Settings</button>
 </nav>
 <input id="q" placeholder="Search hero…" style="display:none" />
 <main id="list">Loading…</main>

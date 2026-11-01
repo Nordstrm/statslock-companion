@@ -1,11 +1,14 @@
 // Plain JS (no bundler) keeps the installer tiny.
-const { invoke } = window.__TAURI__.core;
-const { listen } = window.__TAURI__.event;
-const { open: openUrl } = window.__TAURI__.opener ?? {};
+// Requires "withGlobalTauri": true in tauri.conf.json.
+const T = window.__TAURI__;
+if (!T?.core) { document.getElementById("list").innerHTML = '<div class="card err">App bridge not available. Please reinstall the latest Statslock Companion.</div>'; throw new Error("no __TAURI__"); }
+const { invoke } = T.core;
+const { listen } = T.event;
 const SITE = "https://statslock.io";
 const list = document.getElementById("list");
 const q = document.getElementById("q");
 let liveError = null, pollTimer = null;
+let metaError = null, settings = { hotkey: "F8", opacity: 0.94 }, listening = false, settingsMsg = "";
 let meta = null, me = null, live = null, tab = "live", gameRunning = false, profile = null;
 // Local cache: your public profile summary is stored on this PC so the app opens instantly.
 const PROFILE_KEY = "statslock.profile.v1";
@@ -52,7 +55,7 @@ function renderMe() {
 }
 
 function renderMeta() {
-  if (!meta) return "No data yet — connect to the internet once.";
+  if (!meta) return `<div class="card">${metaError ? `<span class="err">${esc(metaError)}</span><br>` : "Downloading meta builds…<br>"}<button class="code" data-action="reload">Retry</button></div>`;
   const term = q.value.trim().toLowerCase();
   const heroes = meta.heroes.filter((h) => !term || h.hero_name.toLowerCase().includes(term)).slice(0, term ? 10 : 44);
   return heroes.map((h) => {
@@ -67,18 +70,51 @@ function renderMeta() {
   }).join("");
 }
 
+function renderSettings() {
+  return `<div class="card"><h3>Overlay hotkey</h3>
+    <div class="row"><span>Press to show / hide in game</span><button class="key ${listening ? "listening" : ""}" data-action="hotkey">${listening ? "Press keys…" : esc(settings.hotkey)}</button></div>
+    <div class="row" style="justify-content:flex-start;margin-top:4px">${listening ? "Press Esc to cancel." : "Click, then press a key or combo (e.g. Ctrl+Shift+S)."}</div>
+    ${settingsMsg ? `<div class="err" style="margin-top:4px">${esc(settingsMsg)}</div>` : ""}
+    <button class="code" data-action="reset-hotkey" style="margin-top:6px">Reset to F8</button></div>
+  <div class="card"><h3>Background opacity</h3><input type="range" id="opacity" min="50" max="100" value="${Math.round(settings.opacity * 100)}" /></div>
+  <div class="card"><h3>Opening the overlay</h3><div class="muted">Use your hotkey, double-click the tray icon, or right-click it → Show.</div></div>`;
+}
+
 function render() {
   q.style.display = tab === "meta" ? "" : "none";
-  list.innerHTML = tab === "live" ? renderLive() : tab === "me" ? renderMe() : renderMeta();
+  list.innerHTML = tab === "live" ? renderLive() : tab === "me" ? renderMe() : tab === "settings" ? renderSettings() : renderMeta();
 }
+function setTab(t) { tab = t; document.querySelectorAll("nav button").forEach((b) => b.classList.toggle("on", b.dataset.tab === t)); render(); }
+function applyOpacity() { document.documentElement.style.setProperty("--op", settings.opacity); }
+function updateStatus() { document.getElementById("status").textContent = `${gameRunning ? "Deadlock running" : "Waiting for Deadlock…"} · ${settings.hotkey}`; }
+
+const KEYMAP = { " ": "Space", ArrowUp: "Up", ArrowDown: "Down", ArrowLeft: "Left", ArrowRight: "Right" };
+async function saveHotkey(combo) {
+  try { settings.hotkey = await invoke("set_hotkey", { hotkey: combo }); settingsMsg = ""; }
+  catch (e) { settingsMsg = String(e); }
+  listening = false; updateStatus(); render();
+}
+window.addEventListener("keydown", (e) => {
+  if (!listening) return;
+  e.preventDefault();
+  if (e.key === "Escape") { listening = false; render(); return; }
+  if (["Control", "Shift", "Alt", "Meta"].includes(e.key)) return;
+  let key = KEYMAP[e.key] ?? (e.code.startsWith("Key") ? e.code.slice(3) : e.code.startsWith("Digit") ? e.code.slice(5) : e.key.length === 1 ? e.key.toUpperCase() : e.key);
+  const mods = [e.ctrlKey && "Ctrl", e.altKey && "Alt", e.shiftKey && "Shift"].filter(Boolean);
+  saveHotkey([...mods, key].join("+"));
+});
+list.addEventListener("input", (e) => {
+  if (e.target.id !== "opacity") return;
+  settings.opacity = Number(e.target.value) / 100; applyOpacity();
+  invoke("set_opacity", { opacity: settings.opacity }).catch(() => {});
+});
+document.getElementById("close").addEventListener("click", () => invoke("hide_overlay").catch(() => {}));
 
 async function pollLive() {
   if (me && gameRunning && !document.hidden) {
     try {
-      const r = await fetch(`${SITE}/api/public/companion/live?account_id=${me}`);
-      if (!r.ok) { liveError = `Live lookup failed (${r.status}). Retrying…`; }
-      else { liveError = null; live = await r.json(); const self = live.players?.find((p) => p.me); if (self?.name) profile = { name: self.name, rank_tier: self.rank_tier, sub_rank: self.sub_rank, wins: self.wins, losses: self.losses }; saveProfile(); }
-    } catch { liveError = "Can't reach statslock.io — check your internet. Retrying…"; }
+      { liveError = null; live = await invoke("get_live", { accountId: me }); const self = live.players?.find((p) => p.me); if (self?.name) profile = { name: self.name, rank_tier: self.rank_tier, sub_rank: self.sub_rank, wins: self.wins, losses: self.losses }; saveProfile(); }
+    } catch (e) { liveError = String(e); }
     render();
   }
   clearTimeout(pollTimer);
@@ -86,12 +122,15 @@ async function pollLive() {
 }
 
 document.querySelector("nav").addEventListener("click", (e) => {
-  const t = e.target?.dataset?.tab; if (!t) return;
-  tab = t; document.querySelectorAll("nav button").forEach((b) => b.classList.toggle("on", b.dataset.tab === t)); render();
+  const t = e.target?.closest("button")?.dataset?.tab; if (t) setTab(t);
 });
 list.addEventListener("click", async (e) => {
+  const action = e.target?.dataset?.action;
+  if (action === "hotkey") { listening = true; settingsMsg = ""; render(); return; }
+  if (action === "reset-hotkey") return saveHotkey("F8");
+  if (action === "reload") { metaError = null; render(); await invoke("reload_meta").catch(() => {}); return loadMeta(); }
   const url = e.target?.dataset?.url;
-  if (url) { e.preventDefault(); if (openUrl) await openUrl(url); else await invoke("open_url", { url }).catch(() => {}); return; }
+  if (url) { e.preventDefault(); await invoke("open_url", { url }).catch(() => {}); return; }
   const id = e.target?.dataset?.id;
   if (!id) return;
   await navigator.clipboard.writeText(id);
@@ -107,12 +146,22 @@ listen("game-state", (e) => {
 });
 document.addEventListener("visibilitychange", () => { if (!document.hidden && gameRunning) pollLive(); });
 
-(async function load() {
-  me = await invoke("steam_account_id").catch(() => null);
-  gameRunning = await invoke("game_running").catch(() => false);
-  document.getElementById("status").textContent = gameRunning ? "Deadlock running · F8" : "Waiting for Deadlock… · F8";
-  meta = await invoke("get_meta").catch(() => null);
-  if (!gameRunning) tab = "me", document.querySelectorAll("nav button").forEach((b) => b.classList.toggle("on", b.dataset.tab === "me"));
+async function loadMeta() {
+  const r = await invoke("get_meta").catch((e) => ({ data: null, error: String(e) }));
+  meta = r?.data ?? null; metaError = r?.error ?? null;
   render();
-  if (!meta) setTimeout(load, 3000); else pollLive();
+}
+
+(async function init() {
+  settings = await invoke("get_settings").catch(() => settings);
+  applyOpacity();
+  [me, gameRunning] = await Promise.all([invoke("steam_account_id").catch(() => null), invoke("game_running").catch(() => false)]);
+  updateStatus();
+  setTab(gameRunning ? "live" : "me");
+  await loadMeta();
+  listen("meta-updated", loadMeta);
+  listen("game-state", (ev) => { gameRunning = !!ev.payload; live = null; updateStatus(); if (gameRunning) setTab("live"); pollLive(); });
+  listen("open-tab", (ev) => setTab(ev.payload));
+  listen("overlay-shown", () => { if (gameRunning) pollLive(); });
+  pollLive();
 })();

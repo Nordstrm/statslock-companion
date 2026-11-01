@@ -1,9 +1,11 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Statslock Companion",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "identifier": "io.statslock.companion",
-  "build": { "frontendDist": "../src" },
+  "build": {
+    "frontendDist": "../src"
+  },
   "app": {
     "windows": [
       {
@@ -20,19 +22,31 @@
         "resizable": true
       }
     ],
-    "security": { "csp": "default-src 'self'; connect-src https://statslock.io; img-src 'self' https: data:" }
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost https://statslock.io; img-src 'self' https: data:"
+    },
+    "withGlobalTauri": true
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis"],
+    "targets": [
+      "nsis"
+    ],
     "createUpdaterArtifacts": true,
-    "icon": ["icons/icon.ico", "icons/icon.png"]
+    "icon": [
+      "icons/icon.ico",
+      "icons/icon.png"
+    ]
   },
   "plugins": {
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IENDNTFBNURBM0YxREFCOTAKUldTUXF4MC8ycVZSekpRU283Ni9yQ2lZcXlncnNlUXFUV0dadXc2Ly8yT1g2anNPOVlLc2dNUTcK",
-      "endpoints": ["https://github.com/Nordstrm/statslock-companion/releases/latest/download/latest.json"],
-      "windows": { "installMode": "passive" }
+      "endpoints": [
+        "https://github.com/Nordstrm/statslock-companion/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
     }
   }
 }
