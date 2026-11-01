@@ -6,6 +6,10 @@ const SITE = "https://statslock.io";
 const list = document.getElementById("list");
 const q = document.getElementById("q");
 let meta = null, me = null, live = null, tab = "live", gameRunning = false, profile = null;
+// Local cache: your public profile summary is stored on this PC so the app opens instantly.
+const PROFILE_KEY = "statslock.profile.v1";
+try { profile = JSON.parse(localStorage.getItem(PROFILE_KEY) || "null"); } catch { profile = null; }
+const saveProfile = () => { try { localStorage.setItem(PROFILE_KEY, JSON.stringify({ ...profile, saved_at: Date.now() })); } catch {} };
 
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const names = (v) => (Array.isArray(v) ? v.slice(0, 6).map((x) => (typeof x === "string" ? x : x?.name ?? x?.hero_name ?? "")).filter(Boolean) : []);
@@ -67,14 +71,14 @@ function render() {
 }
 
 async function pollLive() {
-  if (me && gameRunning) {
+  if (me && gameRunning && !document.hidden) {
     try {
       const r = await fetch(`${SITE}/api/public/companion/live?account_id=${me}`);
-      if (r.ok) { live = await r.json(); const self = live.players?.find((p) => p.me); if (self?.name) profile = { name: self.name, rank_tier: self.rank_tier, sub_rank: self.sub_rank, wins: self.wins, losses: self.losses }; }
+      if (r.ok) { live = await r.json(); const self = live.players?.find((p) => p.me); if (self?.name) profile = { name: self.name, rank_tier: self.rank_tier, sub_rank: self.sub_rank, wins: self.wins, losses: self.losses }; saveProfile(); }
     } catch { /* offline: keep last result */ }
     render();
   }
-  setTimeout(pollLive, 30_000);
+  setTimeout(pollLive, gameRunning ? 30_000 : 60_000);
 }
 
 document.querySelector("nav").addEventListener("click", (e) => {
