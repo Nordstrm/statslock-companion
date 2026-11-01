@@ -5,6 +5,7 @@ const { open: openUrl } = window.__TAURI__.opener ?? {};
 const SITE = "https://statslock.io";
 const list = document.getElementById("list");
 const q = document.getElementById("q");
+let liveError = null, pollTimer = null;
 let meta = null, me = null, live = null, tab = "live", gameRunning = false, profile = null;
 // Local cache: your public profile summary is stored on this PC so the app opens instantly.
 const PROFILE_KEY = "statslock.profile.v1";
@@ -33,7 +34,8 @@ function playerCard(p) {
 function renderLive() {
   if (!gameRunning && !live?.in_match) return `<div class="card">Start Deadlock and join a match — both teams will show here.<br><span class="muted">Only matches listed by the public Deadlock API can be found, so some games may not appear.</span></div>`;
   if (!me) return `<div class="card">Couldn't find your Steam account. Make sure Steam is running.</div>`;
-  if (!live) return "Looking for your match…";
+  if (liveError) return `<div class="card">${esc(liveError)}</div>`;
+  if (!live) return `<div class="card">Looking for your match…</div>`;
   if (!live.in_match) return `<div class="card">No live match found for you yet. Checking every 30 seconds.<br><span class="muted">Only matches listed by the public Deadlock API can be found.</span></div>`;
   const enemies = live.players.filter((p) => !p.ally), allies = live.players.filter((p) => p.ally);
   return `<div class="row"><span>Match ${esc(live.match_id)}${live.match_mode ? " · " + esc(live.match_mode) : ""}</span>${link(`${SITE}/match/${live.match_id}`, "Open")}</div>
@@ -74,11 +76,13 @@ async function pollLive() {
   if (me && gameRunning && !document.hidden) {
     try {
       const r = await fetch(`${SITE}/api/public/companion/live?account_id=${me}`);
-      if (r.ok) { live = await r.json(); const self = live.players?.find((p) => p.me); if (self?.name) profile = { name: self.name, rank_tier: self.rank_tier, sub_rank: self.sub_rank, wins: self.wins, losses: self.losses }; saveProfile(); }
-    } catch { /* offline: keep last result */ }
+      if (!r.ok) { liveError = `Live lookup failed (${r.status}). Retrying…`; }
+      else { liveError = null; live = await r.json(); const self = live.players?.find((p) => p.me); if (self?.name) profile = { name: self.name, rank_tier: self.rank_tier, sub_rank: self.sub_rank, wins: self.wins, losses: self.losses }; saveProfile(); }
+    } catch { liveError = "Can't reach statslock.io — check your internet. Retrying…"; }
     render();
   }
-  setTimeout(pollLive, gameRunning ? 30_000 : 60_000);
+  clearTimeout(pollTimer);
+  pollTimer = setTimeout(pollLive, gameRunning ? 30_000 : 60_000);
 }
 
 document.querySelector("nav").addEventListener("click", (e) => {
@@ -99,13 +103,15 @@ listen("game-state", (e) => {
   gameRunning = !!e.payload; if (!gameRunning) live = null;
   document.getElementById("status").textContent = gameRunning ? "Deadlock running · F8" : "Waiting for Deadlock… · F8";
   render();
+  if (gameRunning) pollLive(); // look up the match right away, not after the next timer
 });
+document.addEventListener("visibilitychange", () => { if (!document.hidden && gameRunning) pollLive(); });
 
 (async function load() {
   me = await invoke("steam_account_id").catch(() => null);
   gameRunning = await invoke("game_running").catch(() => false);
   document.getElementById("status").textContent = gameRunning ? "Deadlock running · F8" : "Waiting for Deadlock… · F8";
-  meta = await invoke("get_meta");
+  meta = await invoke("get_meta").catch(() => null);
   if (!gameRunning) tab = "me", document.querySelectorAll("nav button").forEach((b) => b.classList.toggle("on", b.dataset.tab === "me"));
   render();
   if (!meta) setTimeout(load, 3000); else pollLive();

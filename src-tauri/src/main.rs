@@ -72,10 +72,11 @@ fn open_url(url: String) {
 }
 
 fn game_is_running(sys: &mut System) -> bool {
-    sys.refresh_processes_specifics(sysinfo::ProcessesToUpdate::All, true, ProcessRefreshKind::new());
+    sys.refresh_processes_specifics(sysinfo::ProcessesToUpdate::All, true, ProcessRefreshKind::new().with_exe(sysinfo::UpdateKind::OnlyIfNotSet));
     sys.processes().values().any(|p| {
         let n = p.name().to_string_lossy().to_lowercase();
-        GAME_EXES.contains(&n.as_str())
+        let exe = p.exe().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
+        GAME_EXES.contains(&n.as_str()) || n.contains("project8") || exe.contains("project8.exe") || exe.contains("\\deadlock\\game\\")
     })
 }
 
