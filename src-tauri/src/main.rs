@@ -142,6 +142,13 @@ fn set_opacity(state: State<AppState>, opacity: f32) {
 }
 
 #[tauri::command]
+fn show_main(app: AppHandle) { show_main_window(&app); }
+#[tauri::command]
+fn hide_main(app: AppHandle) { if let Some(w) = app.get_webview_window("main") { let _ = w.hide(); } }
+#[tauri::command]
+fn show_overlay_cmd(app: AppHandle) { show_overlay(&app); }
+
+#[tauri::command]
 fn hide_overlay(app: AppHandle) { if let Some(w) = app.get_webview_window("overlay") { let _ = w.hide(); } }
 
 /// Opens statslock.io links in the default browser (only https://statslock.io).
@@ -169,6 +176,15 @@ fn show_overlay(app: &AppHandle) {
     }
 }
 
+/// The normal app window: taskbar, resizable, focusable.
+fn show_main_window(app: &AppHandle) {
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.show();
+        let _ = w.unminimize();
+        let _ = w.set_focus();
+    }
+}
+
 fn toggle_overlay(app: &AppHandle) {
     if let Some(w) = app.get_webview_window("overlay") {
         // Show without taking focus so Deadlock stays the active window.
@@ -190,7 +206,7 @@ fn main() {
         )
         .invoke_handler(tauri::generate_handler![
             get_meta, reload_meta, get_live, steam_account_id, game_running,
-            get_settings, set_hotkey, set_opacity, hide_overlay, open_url
+            get_settings, set_hotkey, set_opacity, hide_overlay, open_url, show_main, hide_main, show_overlay_cmd
         ])
         .setup(move |app| {
             // Register saved hotkey; fall back to F8 if it's invalid or taken.
@@ -203,23 +219,33 @@ fn main() {
             }
 
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let show = MenuItem::with_id(app, "show", "Show / hide overlay", true, None::<&str>)?;
+            let open = MenuItem::with_id(app, "open", "Open Statslock", true, None::<&str>)?;
+            let show = MenuItem::with_id(app, "show", "Show / hide in-game overlay", true, None::<&str>)?;
             let settings = MenuItem::with_id(app, "settings", "Settings", true, None::<&str>)?;
             TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
-                .tooltip("Statslock Companion — double-click to open")
-                .menu(&Menu::with_items(app, &[&show, &settings, &quit])?)
+                .tooltip("Statslock Companion — double-click to open the app")
+                .menu(&Menu::with_items(app, &[&open, &show, &settings, &quit])?)
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, e| match e.id.as_ref() {
                     "quit" => app.exit(0),
+                    "open" => show_main_window(app),
                     "show" => toggle_overlay(app),
-                    "settings" => { show_overlay(app); let _ = app.emit("open-tab", "settings"); }
+                    "settings" => { show_main_window(app); let _ = app.emit("open-tab", "settings"); }
                     _ => {}
                 })
                 .on_tray_icon_event(|tray, ev| {
-                    if let TrayIconEvent::DoubleClick { button: MouseButton::Left, .. } = ev { show_overlay(tray.app_handle()); }
+                    if let TrayIconEvent::DoubleClick { button: MouseButton::Left, .. } = ev { show_main_window(tray.app_handle()); }
                 })
                 .build(app)?;
+
+            // Closing the app window hides it to the tray instead of quitting.
+            if let Some(main) = app.get_webview_window("main") {
+                let m = main.clone();
+                main.on_window_event(move |ev| { if let tauri::WindowEvent::CloseRequested { api, .. } = ev { api.prevent_close(); let _ = m.hide(); } });
+            }
+            // Autostart passes --hidden; a normal launch opens the app window.
+            if !std::env::args().any(|a| a == "--hidden") { show_main_window(app.handle()); }
 
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {

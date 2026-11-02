@@ -1,7 +1,8 @@
 {
   "identifier": "default",
   "windows": [
-    "overlay"
+    "overlay",
+    "main"
   ],
   "permissions": [
     "core:default",
